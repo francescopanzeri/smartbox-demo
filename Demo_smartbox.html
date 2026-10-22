@@ -1,0 +1,530 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>SmartBox Locker Demo</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=Figtree:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: explainer column + phone frame that runs the real flow (scan → choose → sign in → rent → return) */
+:root{
+  --bg:#EEF0F1; --surface:#FFFFFF; --ink:#2F3439; --muted:#66727F; --line:#DCE0E4;
+  --accent:#E8590C; --accent-ink:#FFFFFF; --accent-soft:#FDEBDD; --ok:#1F7A4D; --ok-soft:#DDF2E6;
+  --frame:#1E2226; --screen:#F7F6F4;
+  --display:'Archivo', 'Helvetica Neue', Arial, sans-serif;
+  --body:'Figtree', 'Segoe UI', Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#15181B; --surface:#22272C; --ink:#ECEEF0; --muted:#9AA6B2; --line:#343B42;
+  --accent:#FF7A33; --accent-ink:#1A1A1A; --accent-soft:#3A2618; --ok:#4CC38A; --ok-soft:#1C3328;
+  --frame:#0A0C0E; --screen:#1B1F23; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#15181B; --surface:#22272C; --ink:#ECEEF0; --muted:#9AA6B2; --line:#343B42;
+  --accent:#FF7A33; --accent-ink:#1A1A1A; --accent-soft:#3A2618; --ok:#4CC38A; --ok-soft:#1C3328;
+  --frame:#0A0C0E; --screen:#1B1F23; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));padding-block:32px}
+.wrap{max-width:1040px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr) 390px;gap:48px;align-items:start}
+@media (max-width:860px){.wrap{grid-template-columns:minmax(0,1fr);gap:24px}}
+.intro{padding-top:24px;min-width:0}
+.eyebrow{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+h1{font-family:var(--display);font-weight:800;font-size:clamp(30px,4vw,44px);line-height:1.05;margin:8px 0 12px;text-wrap:balance}
+h1 span{color:var(--accent)}
+.intro p{max-width:60ch;color:var(--muted);margin:0 0 20px}
+.steps{list-style:none;padding:0;margin:0 0 20px;display:grid;gap:8px}
+.steps li{display:grid;grid-template-columns:28px 1fr;gap:10px;align-items:start;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--surface)}
+.steps li b{display:block}
+.steps li small{color:var(--muted)}
+.steps .n{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:13px;background:var(--bg);color:var(--muted)}
+.steps li.on{border-color:var(--accent)}
+.steps li.on .n{background:var(--accent);color:var(--accent-ink)}
+.note{font-size:13px;color:var(--muted);border-top:1px solid var(--line);padding-top:12px;max-width:60ch}
+.reset{font:inherit;font-size:13px;background:none;border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:6px 12px;cursor:pointer;margin-bottom:12px}
+
+/* phone */
+.phone{width:100%;max-width:390px;justify-self:center;background:var(--frame);border-radius:44px;padding:12px;box-shadow:0 30px 60px -30px rgba(0,0,0,.45)}
+.screen{background:var(--screen);border-radius:34px;height:760px;max-height:82vh;min-height:600px;overflow:hidden;position:relative;display:flex;flex-direction:column}
+.status{display:flex;justify-content:space-between;padding:12px 24px 4px;font-size:12px;font-weight:600;color:var(--ink)}
+.view{flex:1;min-height:0;overflow-y:auto;padding:12px 20px 20px;display:flex;flex-direction:column;gap:14px}
+.brand{font-family:var(--display);font-weight:800;font-size:20px;letter-spacing:-.01em}
+.brand i{font-style:normal;color:var(--accent)}
+.loc{font-size:13px;color:var(--muted)}
+.btn{font:inherit;font-weight:600;font-size:15px;border:0;border-radius:14px;padding:14px 16px;cursor:pointer;width:100%;text-align:center}
+.btn.primary{background:var(--accent);color:var(--accent-ink)}
+.btn.ghost{background:var(--surface);color:var(--ink);border:1px solid var(--line)}
+.btn:focus-visible,.chip:focus-visible,.card:focus-visible,input:focus-visible,a:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.small{font-size:12px;color:var(--muted)}
+
+/* scan */
+.camera{position:relative;flex:1;border-radius:22px;background:#2b3035;overflow:hidden;display:grid;place-items:center;min-height:360px}
+.locker{width:72%;background:#3D4248;border-radius:12px;padding:14px;display:grid;gap:10px;box-shadow:inset 0 0 0 2px #50575e}
+.locker .doors{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.locker .doors span{height:34px;border-radius:4px;background:#4a5158}
+.locker .tag{color:#F7F6F4;font:700 12px var(--display);letter-spacing:.1em;text-align:center}
+.qr{background:#fff;padding:8px;border-radius:6px;width:120px;margin:0 auto}
+.qr svg{display:block;width:100%;height:auto}
+.reticle{position:absolute;inset:18% 18%;border-radius:18px;pointer-events:none}
+.reticle::before,.reticle::after{content:"";position:absolute;inset:0;border:3px solid transparent;border-radius:18px}
+.reticle::before{border-top-color:#fff;border-left-color:#fff;clip-path:polygon(0 0,30% 0,30% 4%,4% 4%,4% 30%,0 30%)}
+.reticle::after{border-bottom-color:#fff;border-right-color:#fff;clip-path:polygon(70% 96%,96% 96%,96% 70%,100% 70%,100% 100%,70% 100%)}
+.laser{position:absolute;left:20%;right:20%;height:2px;background:var(--accent);box-shadow:0 0 12px var(--accent);top:20%;opacity:0}
+.scanning .laser{opacity:1;animation:sweep 1.2s ease-in-out infinite alternate}
+@keyframes sweep{to{top:78%}}
+.toast{position:absolute;left:16px;right:16px;bottom:16px;background:var(--surface);color:var(--ink);border-radius:14px;padding:12px 14px;font-size:13px;display:flex;gap:10px;align-items:center;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+.toast b{display:block}
+.camera-hint{color:#e7e9eb;font-size:13px;text-align:center}
+
+/* choose */
+.hero-card{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:16px;display:grid;gap:6px}
+.hero-card h2{font-family:var(--display);font-size:22px;margin:0;line-height:1.15;text-wrap:balance}
+.free{display:inline-block;background:var(--ok-soft);color:var(--ok);font-weight:700;font-size:12px;padding:3px 8px;border-radius:999px;justify-self:start}
+.option{display:grid;grid-template-columns:44px 1fr;gap:12px;align-items:center;text-align:left}
+.option .ico{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent)}
+.btn.primary .ico{background:rgba(255,255,255,.2);color:var(--accent-ink)}
+.option small{display:block;font-weight:400;opacity:.85}
+.sheet{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:16px;display:grid;gap:10px}
+
+/* login */
+label{font-weight:600;font-size:13px;display:grid;gap:6px}
+input{font:inherit;font-size:16px;padding:13px 14px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink);width:100%}
+.err{color:#C0392B;font-size:12px;min-height:16px}
+:root[data-theme="dark"] .err{color:#FF8A80}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .err{color:#FF8A80}}
+
+/* catalog */
+.hello{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.timer-pill{font-size:12px;font-weight:700;background:var(--ok-soft);color:var(--ok);border-radius:999px;padding:4px 10px;white-space:nowrap}
+.chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px}
+.chip{font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:7px 12px;border-radius:999px;cursor:pointer;white-space:nowrap}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--screen);border-color:var(--ink)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.card{font:inherit;color:inherit;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:10px;display:grid;gap:6px;cursor:pointer}
+.card .pic{aspect-ratio:4/3;max-width:100%;border-radius:10px;display:grid;place-items:center;background:var(--bg);color:var(--ink)}
+.card .pic svg{width:48%;height:auto}
+.card b{font-size:14px;line-height:1.25}
+.card .meta{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);gap:4px}
+.card .left{color:var(--ok);font-weight:700}
+.card .left.low{color:var(--accent)}
+.by{font-size:11px;color:var(--muted)}
+
+/* detail */
+.back{font:inherit;font-weight:600;background:none;border:0;color:var(--ink);padding:0;cursor:pointer;justify-self:start;display:flex;align-items:center;gap:4px}
+.big-pic{aspect-ratio:16/10;max-width:100%;border-radius:18px;background:var(--surface);border:1px solid var(--line);display:grid;place-items:center}
+.big-pic svg{width:34%;height:auto}
+.rows{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:4px 14px}
+.row{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);font-size:14px}
+.row:last-child{border-bottom:0}
+.row span:last-child{font-weight:600;text-align:right;font-variant-numeric:tabular-nums}
+.supplier{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--accent-soft);border-radius:14px;padding:12px 14px;font-size:13px}
+.supplier a{color:var(--ink);font-weight:700;white-space:nowrap}
+
+/* open */
+.open-hero{display:grid;place-items:center;gap:8px;text-align:center;padding:12px 0}
+.door{width:120px;height:150px;border-radius:12px;background:#3D4248;position:relative;perspective:400px}
+.door::after{content:"";position:absolute;inset:6px;border-radius:8px;background:var(--accent);transform-origin:left center;animation:open .9s ease-out forwards}
+@keyframes open{to{transform:rotateY(-70deg);opacity:.85}}
+.door b{position:absolute;inset:0;display:grid;place-items:center;color:#F7F6F4;font:800 28px var(--display);z-index:1}
+.clock{font:800 44px var(--display);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.done{display:grid;place-items:center;gap:8px;text-align:center;padding:24px 0}
+.shot{aspect-ratio:4/3;max-width:100%;border-radius:18px;border:2px dashed var(--line);background:var(--surface);display:grid;place-items:center;overflow:hidden;text-align:center;color:var(--muted);font-size:13px;padding:12px}
+.shot img{width:100%;height:100%;object-fit:cover;border-radius:12px}
+.shot.has{border-style:solid;border-color:var(--ok);padding:0}
+.file{position:relative;overflow:hidden}
+.file input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.paylist{display:grid;gap:8px}
+.payopt{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:10px 12px;display:grid;grid-template-columns:40px 1fr 20px;gap:12px;align-items:center;text-align:left;cursor:pointer}
+.payopt .ico{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;background:var(--bg)}
+.payopt small{display:block;color:var(--muted);font-size:12px}
+.payopt .dot{width:20px;height:20px;border-radius:50%;border:2px solid var(--line)}
+.payopt[aria-checked="true"]{border-color:var(--accent)}
+.payopt[aria-checked="true"] .dot{border:6px solid var(--accent)}
+.payopt:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.check{width:72px;height:72px;border-radius:50%;background:var(--ok-soft);color:var(--ok);display:grid;place-items:center}
+@media (prefers-reduced-motion: reduce){.scanning .laser,.door::after{animation:none}.door::after{transform:rotateY(-70deg)}}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <section class="intro">
+    <div class="eyebrow">SmartBox · Clickable demo</div>
+    <h1>Scan, borrow, <span>play.</span></h1>
+    <p>This demo shows how a person at the beach or in the park uses a SmartBox locker: they scan the QR code on the locker, open the web app without installing anything, sign in with just a name and an email, and borrow gear supplied by partner brands.</p>
+    <ol class="steps" id="steps">
+      <li data-step="scan"><span class="n">1</span><div><b>Scan the QR code</b><small>Printed on every locker door</small></div></li>
+      <li data-step="choose"><span class="n">2</span><div><b>App or web app</b><small>No download needed to start</small></div></li>
+      <li data-step="login"><span class="n">3</span><div><b>Quick sign-in</b><small>Only name and email</small></div></li>
+      <li data-step="catalog"><span class="n">4</span><div><b>Pick something to borrow</b><small>Sports gear, kids' toys, a safe locker</small></div></li>
+      <li data-step="pay"><span class="n">5</span><div><b>Choose how to pay</b><small>Apple Pay, Google Pay, MB WAY or card</small></div></li>
+      <li data-step="open"><span class="n">6</span><div><b>Locker opens, play</b><small>Gear free for 90 minutes · personal locker always paid</small></div></li>
+      <li data-step="photo"><span class="n">7</span><div><b>Return with a photo</b><small>A photo proves the item is back and undamaged</small></div></li>
+    </ol>
+    <button class="reset" id="reset" type="button">Restart the demo</button>
+    <p class="note">Demo only: nothing you type is sent or saved. Brands shown are examples of possible gear partners, not real partnerships. Prices and locations are illustrative.</p>
+  </section>
+
+  <div class="phone" aria-label="Phone simulation">
+    <div class="screen">
+      <div class="status"><span id="clock">16:42</span><span>5G · 82%</span></div>
+
+      <!-- 1 SCAN -->
+      <div class="view" id="v-scan">
+        <div><div class="brand">Smart<i>Box</i></div><div class="loc">Camera</div></div>
+        <div class="camera" id="camera">
+          <div class="locker">
+            <div class="tag">SMARTBOX · 24/7</div>
+            <div class="doors"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+            <div class="qr" id="qr" aria-label="QR code on the locker"></div>
+            <div class="tag" style="font-size:10px;opacity:.8">SCAN TO BORROW</div>
+          </div>
+          <div class="reticle"></div>
+          <div class="laser"></div>
+          <div class="toast" id="scanToast" hidden>
+            <div class="check" style="width:36px;height:36px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5 9-10"/></svg></div>
+            <div><b>smartbox.pt/l/MTS-07</b><span class="small">Tap to open</span></div>
+          </div>
+        </div>
+        <p class="camera-hint small" style="color:var(--muted)">Point the camera at the QR code on the locker.</p>
+        <button class="btn primary" id="scanBtn" type="button">Scan QR code</button>
+      </div>
+
+      <!-- 2 CHOOSE -->
+      <div class="view" id="v-choose" hidden>
+        <div><div class="brand">Smart<i>Box</i></div><div class="loc">Locker MTS-07 · Praia de Matosinhos</div></div>
+        <div class="hero-card">
+          <span class="free">Gear free for 90 min</span>
+          <h2>Borrow gear and lock your things, right here.</h2>
+          <span class="small">13 items available now · open 24/7</span>
+        </div>
+        <button class="btn primary option" id="webBtn" type="button">
+          <span class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/></svg></span>
+          <span>Continue in the web app<small>Start now, nothing to install</small></span>
+        </button>
+        <button class="btn ghost option" id="appBtn" type="button">
+          <span class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg></span>
+          <span>Install the SmartBox app<small>For frequent users: favourites and history</small></span>
+        </button>
+        <div class="sheet" id="appSheet" hidden>
+          <b>The app is coming soon</b>
+          <span class="small">In this demo the store page is not available. The web app does everything you need to borrow gear.</span>
+          <button class="btn primary" id="appToWeb" type="button">Use the web app instead</button>
+        </div>
+      </div>
+
+      <!-- 3 LOGIN -->
+      <div class="view" id="v-login" hidden>
+        <div><div class="brand">Smart<i>Box</i></div><div class="loc">Locker MTS-07 · Praia de Matosinhos</div></div>
+        <div>
+          <h2 style="font-family:var(--display);font-size:24px;margin:8px 0 4px">Who's playing?</h2>
+          <span class="small">No password, no long form. We use your email only to send the receipt and return your deposit.</span>
+        </div>
+        <form id="loginForm" novalidate style="display:grid;gap:12px">
+          <label for="name">Name<input id="name" name="name" autocomplete="given-name" placeholder="Ana" value="Ana"></label>
+          <label for="email">Email<input id="email" name="email" type="email" autocomplete="email" placeholder="ana@example.com" value="ana@example.com"></label>
+          <div class="err" id="err" role="alert"></div>
+          <button class="btn primary" type="submit">Continue</button>
+        </form>
+        <span class="small">Example details are filled in. Nothing is sent or saved in this demo.</span>
+      </div>
+
+      <!-- 4 CATALOG -->
+      <div class="view" id="v-catalog" hidden>
+        <div class="hello">
+          <div><div class="brand" id="hi">Hi, Ana</div><div class="loc">Locker MTS-07 · Praia de Matosinhos</div></div>
+          <span class="timer-pill">Gear 90 min free</span>
+        </div>
+        <div class="chips" role="group" aria-label="Categories" id="chips"></div>
+        <div class="grid" id="grid"></div>
+        <span class="small">Gear supplied by partner brands. Tap an item to see who supplies it.</span>
+      </div>
+
+      <!-- 5 DETAIL -->
+      <div class="view" id="v-detail" hidden></div>
+
+      <!-- 6 OPEN -->
+      <div class="view" id="v-open" hidden></div>
+
+      <!-- PAY -->
+      <div class="view" id="v-pay" hidden></div>
+
+      <!-- 7 PHOTO -->
+      <div class="view" id="v-photo" hidden></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const ICON = {
+    football:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3"><circle cx="32" cy="32" r="26"/><path d="M32 20l10 7-4 12H26l-4-12z" fill="currentColor"/><path d="M32 6v14M42 27l14-5M38 39l8 13M26 39l-8 13M22 27L8 22"/></svg>',
+    volley:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3"><circle cx="32" cy="32" r="26"/><path d="M32 6c-6 12-6 26 0 26s22 8 22 8M32 32c-10 6-20 6-26 2M32 32c4 10 12 18 20 20"/></svg>',
+    racket:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3"><ellipse cx="24" cy="24" rx="16" ry="18" transform="rotate(-35 24 24)"/><path d="M35 36l18 18"/><circle cx="50" cy="14" r="5" fill="currentColor"/></svg>',
+    frisbee:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3"><ellipse cx="32" cy="34" rx="26" ry="10"/><ellipse cx="32" cy="31" rx="14" ry="4"/></svg>',
+    rope:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3"><rect x="8" y="8" width="8" height="18" rx="3" fill="currentColor"/><rect x="48" y="8" width="8" height="18" rx="3" fill="currentColor"/><path d="M12 26c0 30 40 30 40 0"/></svg>',
+    bucket:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3"><path d="M14 22h36l-4 32H18z"/><path d="M18 22c0-14 28-14 28 0"/><path d="M46 12l8-6"/><circle cx="56" cy="48" r="4" fill="currentColor"/></svg>',
+    kite:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3"><path d="M32 4l18 22-18 22-18-22z"/><path d="M32 4v44M14 26h36"/><path d="M32 48c-4 6 4 8 0 12"/></svg>',
+    softball:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3"><circle cx="32" cy="32" r="24"/><circle cx="24" cy="26" r="5" fill="currentColor"/><circle cx="40" cy="24" r="4" fill="currentColor"/><circle cx="36" cy="40" r="6" fill="currentColor"/></svg>',
+    bubbles:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3"><circle cx="40" cy="18" r="10"/><circle cx="20" cy="30" r="7"/><circle cx="44" cy="40" r="5"/><path d="M14 58l12-14"/><circle cx="29" cy="40" r="5"/></svg>',
+    goal:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 50V16h52v34"/><path d="M6 16l8 8h36l8-8M14 24v26M50 24v26M14 32h36M14 40h36M26 24v26M38 24v26"/></svg>',
+    blocks:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3"><rect x="8" y="34" width="22" height="22" rx="3"/><rect x="34" y="34" width="22" height="22" rx="3"/><rect x="21" y="10" width="22" height="22" rx="3" fill="currentColor"/></svg>',
+    car:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3"><path d="M8 40h48v-8l-8-2-8-10H22l-8 10H8z"/><circle cx="20" cy="44" r="6" fill="currentColor"/><circle cx="46" cy="44" r="6" fill="currentColor"/></svg>',
+    lock:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3"><rect x="12" y="28" width="40" height="28" rx="5"/><path d="M20 28v-8a12 12 0 0124 0v8"/><circle cx="32" cy="42" r="4" fill="currentColor"/></svg>'
+  };
+  const dec = q => 'https://www.decathlon.pt/search?Ntt=' + encodeURIComponent(q);
+  const ITEMS = [
+    {id:'football', cat:'Sports', name:'Football', icon:'football', left:3, price:'€1 / hour', deposit:'€10', brand:'Decathlon', url:dec('bola de futebol')},
+    {id:'volley', cat:'Sports', name:'Beach volleyball', icon:'volley', left:2, price:'€1 / hour', deposit:'€10', brand:'Decathlon', url:dec('bola voleibol de praia')},
+    {id:'racket', cat:'Sports', name:'Beach tennis set', icon:'racket', left:1, price:'€2 / hour', deposit:'€20', brand:'Decathlon', url:dec('raquetes beach tennis')},
+    {id:'rope', cat:'Sports', name:'Jump rope', icon:'rope', left:4, price:'€1 / hour', deposit:'€5', brand:'Decathlon', url:dec('corda de saltar')},
+    {id:'frisbee', cat:'Beach', name:'Frisbee', icon:'frisbee', left:5, price:'€1 / hour', deposit:'€5', brand:'Decathlon', url:dec('frisbee')},
+    {id:'kite', cat:'Kids', name:'Kids kite', icon:'kite', left:2, price:'€1 / hour', deposit:'€10', brand:'Decathlon', url:dec('papagaio de papel crianca')},
+    {id:'bucket', cat:'Kids', name:'Sand toys set', icon:'bucket', left:3, price:'€1 / hour', deposit:'€5', brand:'Decathlon', url:dec('kit praia areia crianca')},
+    {id:'softball', cat:'Kids', name:'Soft foam ball', icon:'softball', left:4, price:'€1 / hour', deposit:'€5', brand:'Decathlon', url:dec('bola espuma crianca')},
+    {id:'bubbles', cat:'Kids', name:'Giant bubbles kit', icon:'bubbles', left:3, price:'€1 / hour', deposit:'€5', brand:'Decathlon', url:dec('bolas de sabao')},
+    {id:'goal', cat:'Kids', name:'Mini football goals', icon:'goal', left:1, price:'€1 / hour', deposit:'€15', brand:'Decathlon', url:dec('mini baliza futebol crianca')},
+    {id:'blocks', cat:'Kids', name:'Building blocks', icon:'blocks', left:2, price:'€1 / hour', deposit:'€10', brand:'Decathlon', url:dec('blocos de construcao crianca')},
+    {id:'car', cat:'Kids', name:'Sand truck', icon:'car', left:3, price:'€1 / hour', deposit:'€5', brand:'Decathlon', url:dec('camiao areia praia crianca')},
+    {id:'lock', cat:'Storage', name:'Safe locker for your things', icon:'lock', left:6, price:'€1 / hour', deposit:'none', brand:'SmartBox', url:null}
+  ];
+  ITEMS.forEach(i => { i.rate = parseFloat(i.price.replace('€','')); });
+  const CATS = ['All','Sports','Kids','Beach','Storage'];
+  const ORDER = ['scan','choose','login','catalog','open'];
+  const views = ['scan','choose','login','catalog','detail','pay','open','photo'];
+  const $ = id => document.getElementById(id);
+  let user = {name:'Ana'}, cat = 'All', timerId = null, scanTimer = null;
+
+  function show(v){
+    views.forEach(n => { $('v-'+n).hidden = n !== v; });
+    const step = v === 'detail' ? 'catalog' : v;
+    document.querySelectorAll('#steps li').forEach(li => li.classList.toggle('on', li.dataset.step === step));
+    $('v-'+v).scrollTop = 0;
+  }
+
+  // real QR code: opens this demo
+  $('qr').innerHTML = '<svg viewBox="0 0 41 41" role="img" aria-label="QR code that opens this demo" shape-rendering="crispEdges"><rect width="41" height="41" fill="#fff"/><g fill="#111"><rect x="4" y="4" width="1" height="1"/><rect x="5" y="4" width="1" height="1"/><rect x="6" y="4" width="1" height="1"/><rect x="7" y="4" width="1" height="1"/><rect x="8" y="4" width="1" height="1"/><rect x="9" y="4" width="1" height="1"/><rect x="10" y="4" width="1" height="1"/><rect x="12" y="4" width="1" height="1"/><rect x="16" y="4" width="1" height="1"/><rect x="17" y="4" width="1" height="1"/><rect x="18" y="4" width="1" height="1"/><rect x="19" y="4" width="1" height="1"/><rect x="20" y="4" width="1" height="1"/><rect x="22" y="4" width="1" height="1"/><rect x="25" y="4" width="1" height="1"/><rect x="27" y="4" width="1" height="1"/><rect x="30" y="4" width="1" height="1"/><rect x="31" y="4" width="1" height="1"/><rect x="32" y="4" width="1" height="1"/><rect x="33" y="4" width="1" height="1"/><rect x="34" y="4" width="1" height="1"/><rect x="35" y="4" width="1" height="1"/><rect x="36" y="4" width="1" height="1"/><rect x="4" y="5" width="1" height="1"/><rect x="10" y="5" width="1" height="1"/><rect x="13" y="5" width="1" height="1"/><rect x="14" y="5" width="1" height="1"/><rect x="15" y="5" width="1" height="1"/><rect x="17" y="5" width="1" height="1"/><rect x="18" y="5" width="1" height="1"/><rect x="20" y="5" width="1" height="1"/><rect x="22" y="5" width="1" height="1"/><rect x="23" y="5" width="1" height="1"/><rect x="24" y="5" width="1" height="1"/><rect x="25" y="5" width="1" height="1"/><rect x="26" y="5" width="1" height="1"/><rect x="28" y="5" width="1" height="1"/><rect x="30" y="5" width="1" height="1"/><rect x="36" y="5" width="1" height="1"/><rect x="4" y="6" width="1" height="1"/><rect x="6" y="6" width="1" height="1"/><rect x="7" y="6" width="1" height="1"/><rect x="8" y="6" width="1" height="1"/><rect x="10" y="6" width="1" height="1"/><rect x="13" y="6" width="1" height="1"/><rect x="15" y="6" width="1" height="1"/><rect x="18" y="6" width="1" height="1"/><rect x="19" y="6" width="1" height="1"/><rect x="20" y="6" width="1" height="1"/><rect x="21" y="6" width="1" height="1"/><rect x="22" y="6" width="1" height="1"/><rect x="24" y="6" width="1" height="1"/><rect x="25" y="6" width="1" height="1"/><rect x="26" y="6" width="1" height="1"/><rect x="27" y="6" width="1" height="1"/><rect x="28" y="6" width="1" height="1"/><rect x="30" y="6" width="1" height="1"/><rect x="32" y="6" width="1" height="1"/><rect x="33" y="6" width="1" height="1"/><rect x="34" y="6" width="1" height="1"/><rect x="36" y="6" width="1" height="1"/><rect x="4" y="7" width="1" height="1"/><rect x="6" y="7" width="1" height="1"/><rect x="7" y="7" width="1" height="1"/><rect x="8" y="7" width="1" height="1"/><rect x="10" y="7" width="1" height="1"/><rect x="12" y="7" width="1" height="1"/><rect x="13" y="7" width="1" height="1"/><rect x="16" y="7" width="1" height="1"/><rect x="19" y="7" width="1" height="1"/><rect x="20" y="7" width="1" height="1"/><rect x="21" y="7" width="1" height="1"/><rect x="26" y="7" width="1" height="1"/><rect x="27" y="7" width="1" height="1"/><rect x="30" y="7" width="1" height="1"/><rect x="32" y="7" width="1" height="1"/><rect x="33" y="7" width="1" height="1"/><rect x="34" y="7" width="1" height="1"/><rect x="36" y="7" width="1" height="1"/><rect x="4" y="8" width="1" height="1"/><rect x="6" y="8" width="1" height="1"/><rect x="7" y="8" width="1" height="1"/><rect x="8" y="8" width="1" height="1"/><rect x="10" y="8" width="1" height="1"/><rect x="12" y="8" width="1" height="1"/><rect x="20" y="8" width="1" height="1"/><rect x="21" y="8" width="1" height="1"/><rect x="23" y="8" width="1" height="1"/><rect x="26" y="8" width="1" height="1"/><rect x="30" y="8" width="1" height="1"/><rect x="32" y="8" width="1" height="1"/><rect x="33" y="8" width="1" height="1"/><rect x="34" y="8" width="1" height="1"/><rect x="36" y="8" width="1" height="1"/><rect x="4" y="9" width="1" height="1"/><rect x="10" y="9" width="1" height="1"/><rect x="12" y="9" width="1" height="1"/><rect x="13" y="9" width="1" height="1"/><rect x="14" y="9" width="1" height="1"/><rect x="15" y="9" width="1" height="1"/><rect x="16" y="9" width="1" height="1"/><rect x="17" y="9" width="1" height="1"/><rect x="19" y="9" width="1" height="1"/><rect x="22" y="9" width="1" height="1"/><rect x="24" y="9" width="1" height="1"/><rect x="26" y="9" width="1" height="1"/><rect x="30" y="9" width="1" height="1"/><rect x="36" y="9" width="1" height="1"/><rect x="4" y="10" width="1" height="1"/><rect x="5" y="10" width="1" height="1"/><rect x="6" y="10" width="1" height="1"/><rect x="7" y="10" width="1" height="1"/><rect x="8" y="10" width="1" height="1"/><rect x="9" y="10" width="1" height="1"/><rect x="10" y="10" width="1" height="1"/><rect x="12" y="10" width="1" height="1"/><rect x="14" y="10" width="1" height="1"/><rect x="16" y="10" width="1" height="1"/><rect x="18" y="10" width="1" height="1"/><rect x="20" y="10" width="1" height="1"/><rect x="22" y="10" width="1" height="1"/><rect x="24" y="10" width="1" height="1"/><rect x="26" y="10" width="1" height="1"/><rect x="28" y="10" width="1" height="1"/><rect x="30" y="10" width="1" height="1"/><rect x="31" y="10" width="1" height="1"/><rect x="32" y="10" width="1" height="1"/><rect x="33" y="10" width="1" height="1"/><rect x="34" y="10" width="1" height="1"/><rect x="35" y="10" width="1" height="1"/><rect x="36" y="10" width="1" height="1"/><rect x="12" y="11" width="1" height="1"/><rect x="13" y="11" width="1" height="1"/><rect x="14" y="11" width="1" height="1"/><rect x="18" y="11" width="1" height="1"/><rect x="21" y="11" width="1" height="1"/><rect x="22" y="11" width="1" height="1"/><rect x="23" y="11" width="1" height="1"/><rect x="24" y="11" width="1" height="1"/><rect x="25" y="11" width="1" height="1"/><rect x="28" y="11" width="1" height="1"/><rect x="4" y="12" width="1" height="1"/><rect x="8" y="12" width="1" height="1"/><rect x="10" y="12" width="1" height="1"/><rect x="11" y="12" width="1" height="1"/><rect x="12" y="12" width="1" height="1"/><rect x="13" y="12" width="1" height="1"/><rect x="14" y="12" width="1" height="1"/><rect x="16" y="12" width="1" height="1"/><rect x="17" y="12" width="1" height="1"/><rect x="19" y="12" width="1" height="1"/><rect x="21" y="12" width="1" height="1"/><rect x="25" y="12" width="1" height="1"/><rect x="28" y="12" width="1" height="1"/><rect x="29" y="12" width="1" height="1"/><rect x="30" y="12" width="1" height="1"/><rect x="31" y="12" width="1" height="1"/><rect x="32" y="12" width="1" height="1"/><rect x="33" y="12" width="1" height="1"/><rect x="36" y="12" width="1" height="1"/><rect x="4" y="13" width="1" height="1"/><rect x="8" y="13" width="1" height="1"/><rect x="14" y="13" width="1" height="1"/><rect x="15" y="13" width="1" height="1"/><rect x="18" y="13" width="1" height="1"/><rect x="20" y="13" width="1" height="1"/><rect x="21" y="13" width="1" height="1"/><rect x="22" y="13" width="1" height="1"/><rect x="27" y="13" width="1" height="1"/><rect x="29" y="13" width="1" height="1"/><rect x="33" y="13" width="1" height="1"/><rect x="34" y="13" width="1" height="1"/><rect x="6" y="14" width="1" height="1"/><rect x="7" y="14" width="1" height="1"/><rect x="10" y="14" width="1" height="1"/><rect x="11" y="14" width="1" height="1"/><rect x="12" y="14" width="1" height="1"/><rect x="17" y="14" width="1" height="1"/><rect x="18" y="14" width="1" height="1"/><rect x="19" y="14" width="1" height="1"/><rect x="22" y="14" width="1" height="1"/><rect x="27" y="14" width="1" height="1"/><rect x="28" y="14" width="1" height="1"/><rect x="33" y="14" width="1" height="1"/><rect x="4" y="15" width="1" height="1"/><rect x="5" y="15" width="1" height="1"/><rect x="6" y="15" width="1" height="1"/><rect x="7" y="15" width="1" height="1"/><rect x="8" y="15" width="1" height="1"/><rect x="11" y="15" width="1" height="1"/><rect x="12" y="15" width="1" height="1"/><rect x="13" y="15" width="1" height="1"/><rect x="16" y="15" width="1" height="1"/><rect x="17" y="15" width="1" height="1"/><rect x="19" y="15" width="1" height="1"/><rect x="23" y="15" width="1" height="1"/><rect x="25" y="15" width="1" height="1"/><rect x="26" y="15" width="1" height="1"/><rect x="27" y="15" width="1" height="1"/><rect x="28" y="15" width="1" height="1"/><rect x="30" y="15" width="1" height="1"/><rect x="36" y="15" width="1" height="1"/><rect x="4" y="16" width="1" height="1"/><rect x="6" y="16" width="1" height="1"/><rect x="8" y="16" width="1" height="1"/><rect x="9" y="16" width="1" height="1"/><rect x="10" y="16" width="1" height="1"/><rect x="13" y="16" width="1" height="1"/><rect x="16" y="16" width="1" height="1"/><rect x="17" y="16" width="1" height="1"/><rect x="20" y="16" width="1" height="1"/><rect x="23" y="16" width="1" height="1"/><rect x="26" y="16" width="1" height="1"/><rect x="30" y="16" width="1" height="1"/><rect x="31" y="16" width="1" height="1"/><rect x="32" y="16" width="1" height="1"/><rect x="33" y="16" width="1" height="1"/><rect x="36" y="16" width="1" height="1"/><rect x="7" y="17" width="1" height="1"/><rect x="8" y="17" width="1" height="1"/><rect x="9" y="17" width="1" height="1"/><rect x="11" y="17" width="1" height="1"/><rect x="12" y="17" width="1" height="1"/><rect x="13" y="17" width="1" height="1"/><rect x="14" y="17" width="1" height="1"/><rect x="17" y="17" width="1" height="1"/><rect x="18" y="17" width="1" height="1"/><rect x="22" y="17" width="1" height="1"/><rect x="23" y="17" width="1" height="1"/><rect x="24" y="17" width="1" height="1"/><rect x="25" y="17" width="1" height="1"/><rect x="27" y="17" width="1" height="1"/><rect x="28" y="17" width="1" height="1"/><rect x="34" y="17" width="1" height="1"/><rect x="5" y="18" width="1" height="1"/><rect x="7" y="18" width="1" height="1"/><rect x="8" y="18" width="1" height="1"/><rect x="9" y="18" width="1" height="1"/><rect x="10" y="18" width="1" height="1"/><rect x="12" y="18" width="1" height="1"/><rect x="13" y="18" width="1" height="1"/><rect x="14" y="18" width="1" height="1"/><rect x="16" y="18" width="1" height="1"/><rect x="17" y="18" width="1" height="1"/><rect x="18" y="18" width="1" height="1"/><rect x="19" y="18" width="1" height="1"/><rect x="22" y="18" width="1" height="1"/><rect x="24" y="18" width="1" height="1"/><rect x="27" y="18" width="1" height="1"/><rect x="29" y="18" width="1" height="1"/><rect x="30" y="18" width="1" height="1"/><rect x="31" y="18" width="1" height="1"/><rect x="35" y="18" width="1" height="1"/><rect x="4" y="19" width="1" height="1"/><rect x="7" y="19" width="1" height="1"/><rect x="8" y="19" width="1" height="1"/><rect x="12" y="19" width="1" height="1"/><rect x="17" y="19" width="1" height="1"/><rect x="19" y="19" width="1" height="1"/><rect x="20" y="19" width="1" height="1"/><rect x="21" y="19" width="1" height="1"/><rect x="25" y="19" width="1" height="1"/><rect x="26" y="19" width="1" height="1"/><rect x="27" y="19" width="1" height="1"/><rect x="29" y="19" width="1" height="1"/><rect x="30" y="19" width="1" height="1"/><rect x="32" y="19" width="1" height="1"/><rect x="4" y="20" width="1" height="1"/><rect x="5" y="20" width="1" height="1"/><rect x="7" y="20" width="1" height="1"/><rect x="8" y="20" width="1" height="1"/><rect x="9" y="20" width="1" height="1"/><rect x="10" y="20" width="1" height="1"/><rect x="11" y="20" width="1" height="1"/><rect x="13" y="20" width="1" height="1"/><rect x="21" y="20" width="1" height="1"/><rect x="23" y="20" width="1" height="1"/><rect x="25" y="20" width="1" height="1"/><rect x="26" y="20" width="1" height="1"/><rect x="27" y="20" width="1" height="1"/><rect x="30" y="20" width="1" height="1"/><rect x="32" y="20" width="1" height="1"/><rect x="33" y="20" width="1" height="1"/><rect x="35" y="20" width="1" height="1"/><rect x="4" y="21" width="1" height="1"/><rect x="5" y="21" width="1" height="1"/><rect x="13" y="21" width="1" height="1"/><rect x="14" y="21" width="1" height="1"/><rect x="16" y="21" width="1" height="1"/><rect x="17" y="21" width="1" height="1"/><rect x="20" y="21" width="1" height="1"/><rect x="22" y="21" width="1" height="1"/><rect x="25" y="21" width="1" height="1"/><rect x="27" y="21" width="1" height="1"/><rect x="29" y="21" width="1" height="1"/><rect x="33" y="21" width="1" height="1"/><rect x="34" y="21" width="1" height="1"/><rect x="5" y="22" width="1" height="1"/><rect x="8" y="22" width="1" height="1"/><rect x="10" y="22" width="1" height="1"/><rect x="11" y="22" width="1" height="1"/><rect x="12" y="22" width="1" height="1"/><rect x="13" y="22" width="1" height="1"/><rect x="16" y="22" width="1" height="1"/><rect x="17" y="22" width="1" height="1"/><rect x="18" y="22" width="1" height="1"/><rect x="19" y="22" width="1" height="1"/><rect x="21" y="22" width="1" height="1"/><rect x="24" y="22" width="1" height="1"/><rect x="27" y="22" width="1" height="1"/><rect x="28" y="22" width="1" height="1"/><rect x="31" y="22" width="1" height="1"/><rect x="33" y="22" width="1" height="1"/><rect x="4" y="23" width="1" height="1"/><rect x="5" y="23" width="1" height="1"/><rect x="6" y="23" width="1" height="1"/><rect x="9" y="23" width="1" height="1"/><rect x="12" y="23" width="1" height="1"/><rect x="14" y="23" width="1" height="1"/><rect x="15" y="23" width="1" height="1"/><rect x="18" y="23" width="1" height="1"/><rect x="21" y="23" width="1" height="1"/><rect x="22" y="23" width="1" height="1"/><rect x="25" y="23" width="1" height="1"/><rect x="26" y="23" width="1" height="1"/><rect x="27" y="23" width="1" height="1"/><rect x="29" y="23" width="1" height="1"/><rect x="31" y="23" width="1" height="1"/><rect x="36" y="23" width="1" height="1"/><rect x="10" y="24" width="1" height="1"/><rect x="11" y="24" width="1" height="1"/><rect x="12" y="24" width="1" height="1"/><rect x="15" y="24" width="1" height="1"/><rect x="18" y="24" width="1" height="1"/><rect x="19" y="24" width="1" height="1"/><rect x="22" y="24" width="1" height="1"/><rect x="23" y="24" width="1" height="1"/><rect x="24" y="24" width="1" height="1"/><rect x="26" y="24" width="1" height="1"/><rect x="30" y="24" width="1" height="1"/><rect x="33" y="24" width="1" height="1"/><rect x="35" y="24" width="1" height="1"/><rect x="36" y="24" width="1" height="1"/><rect x="4" y="25" width="1" height="1"/><rect x="6" y="25" width="1" height="1"/><rect x="7" y="25" width="1" height="1"/><rect x="8" y="25" width="1" height="1"/><rect x="12" y="25" width="1" height="1"/><rect x="16" y="25" width="1" height="1"/><rect x="17" y="25" width="1" height="1"/><rect x="20" y="25" width="1" height="1"/><rect x="23" y="25" width="1" height="1"/><rect x="26" y="25" width="1" height="1"/><rect x="30" y="25" width="1" height="1"/><rect x="31" y="25" width="1" height="1"/><rect x="33" y="25" width="1" height="1"/><rect x="34" y="25" width="1" height="1"/><rect x="35" y="25" width="1" height="1"/><rect x="6" y="26" width="1" height="1"/><rect x="7" y="26" width="1" height="1"/><rect x="9" y="26" width="1" height="1"/><rect x="10" y="26" width="1" height="1"/><rect x="12" y="26" width="1" height="1"/><rect x="13" y="26" width="1" height="1"/><rect x="14" y="26" width="1" height="1"/><rect x="20" y="26" width="1" height="1"/><rect x="21" y="26" width="1" height="1"/><rect x="23" y="26" width="1" height="1"/><rect x="25" y="26" width="1" height="1"/><rect x="26" y="26" width="1" height="1"/><rect x="27" y="26" width="1" height="1"/><rect x="28" y="26" width="1" height="1"/><rect x="31" y="26" width="1" height="1"/><rect x="34" y="26" width="1" height="1"/><rect x="35" y="26" width="1" height="1"/><rect x="8" y="27" width="1" height="1"/><rect x="9" y="27" width="1" height="1"/><rect x="11" y="27" width="1" height="1"/><rect x="12" y="27" width="1" height="1"/><rect x="14" y="27" width="1" height="1"/><rect x="16" y="27" width="1" height="1"/><rect x="18" y="27" width="1" height="1"/><rect x="21" y="27" width="1" height="1"/><rect x="22" y="27" width="1" height="1"/><rect x="23" y="27" width="1" height="1"/><rect x="24" y="27" width="1" height="1"/><rect x="25" y="27" width="1" height="1"/><rect x="27" y="27" width="1" height="1"/><rect x="29" y="27" width="1" height="1"/><rect x="30" y="27" width="1" height="1"/><rect x="31" y="27" width="1" height="1"/><rect x="35" y="27" width="1" height="1"/><rect x="4" y="28" width="1" height="1"/><rect x="5" y="28" width="1" height="1"/><rect x="6" y="28" width="1" height="1"/><rect x="7" y="28" width="1" height="1"/><rect x="8" y="28" width="1" height="1"/><rect x="10" y="28" width="1" height="1"/><rect x="12" y="28" width="1" height="1"/><rect x="14" y="28" width="1" height="1"/><rect x="18" y="28" width="1" height="1"/><rect x="19" y="28" width="1" height="1"/><rect x="21" y="28" width="1" height="1"/><rect x="24" y="28" width="1" height="1"/><rect x="25" y="28" width="1" height="1"/><rect x="26" y="28" width="1" height="1"/><rect x="28" y="28" width="1" height="1"/><rect x="29" y="28" width="1" height="1"/><rect x="30" y="28" width="1" height="1"/><rect x="31" y="28" width="1" height="1"/><rect x="32" y="28" width="1" height="1"/><rect x="34" y="28" width="1" height="1"/><rect x="35" y="28" width="1" height="1"/><rect x="36" y="28" width="1" height="1"/><rect x="12" y="29" width="1" height="1"/><rect x="13" y="29" width="1" height="1"/><rect x="14" y="29" width="1" height="1"/><rect x="19" y="29" width="1" height="1"/><rect x="21" y="29" width="1" height="1"/><rect x="22" y="29" width="1" height="1"/><rect x="28" y="29" width="1" height="1"/><rect x="32" y="29" width="1" height="1"/><rect x="34" y="29" width="1" height="1"/><rect x="4" y="30" width="1" height="1"/><rect x="5" y="30" width="1" height="1"/><rect x="6" y="30" width="1" height="1"/><rect x="7" y="30" width="1" height="1"/><rect x="8" y="30" width="1" height="1"/><rect x="9" y="30" width="1" height="1"/><rect x="10" y="30" width="1" height="1"/><rect x="12" y="30" width="1" height="1"/><rect x="13" y="30" width="1" height="1"/><rect x="14" y="30" width="1" height="1"/><rect x="15" y="30" width="1" height="1"/><rect x="17" y="30" width="1" height="1"/><rect x="19" y="30" width="1" height="1"/><rect x="20" y="30" width="1" height="1"/><rect x="22" y="30" width="1" height="1"/><rect x="24" y="30" width="1" height="1"/><rect x="28" y="30" width="1" height="1"/><rect x="30" y="30" width="1" height="1"/><rect x="32" y="30" width="1" height="1"/><rect x="33" y="30" width="1" height="1"/><rect x="35" y="30" width="1" height="1"/><rect x="4" y="31" width="1" height="1"/><rect x="10" y="31" width="1" height="1"/><rect x="18" y="31" width="1" height="1"/><rect x="19" y="31" width="1" height="1"/><rect x="23" y="31" width="1" height="1"/><rect x="24" y="31" width="1" height="1"/><rect x="25" y="31" width="1" height="1"/><rect x="26" y="31" width="1" height="1"/><rect x="28" y="31" width="1" height="1"/><rect x="32" y="31" width="1" height="1"/><rect x="35" y="31" width="1" height="1"/><rect x="36" y="31" width="1" height="1"/><rect x="4" y="32" width="1" height="1"/><rect x="6" y="32" width="1" height="1"/><rect x="7" y="32" width="1" height="1"/><rect x="8" y="32" width="1" height="1"/><rect x="10" y="32" width="1" height="1"/><rect x="12" y="32" width="1" height="1"/><rect x="14" y="32" width="1" height="1"/><rect x="16" y="32" width="1" height="1"/><rect x="17" y="32" width="1" height="1"/><rect x="20" y="32" width="1" height="1"/><rect x="24" y="32" width="1" height="1"/><rect x="26" y="32" width="1" height="1"/><rect x="28" y="32" width="1" height="1"/><rect x="29" y="32" width="1" height="1"/><rect x="30" y="32" width="1" height="1"/><rect x="31" y="32" width="1" height="1"/><rect x="32" y="32" width="1" height="1"/><rect x="33" y="32" width="1" height="1"/><rect x="35" y="32" width="1" height="1"/><rect x="36" y="32" width="1" height="1"/><rect x="4" y="33" width="1" height="1"/><rect x="6" y="33" width="1" height="1"/><rect x="7" y="33" width="1" height="1"/><rect x="8" y="33" width="1" height="1"/><rect x="10" y="33" width="1" height="1"/><rect x="16" y="33" width="1" height="1"/><rect x="18" y="33" width="1" height="1"/><rect x="22" y="33" width="1" height="1"/><rect x="23" y="33" width="1" height="1"/><rect x="24" y="33" width="1" height="1"/><rect x="25" y="33" width="1" height="1"/><rect x="28" y="33" width="1" height="1"/><rect x="30" y="33" width="1" height="1"/><rect x="31" y="33" width="1" height="1"/><rect x="32" y="33" width="1" height="1"/><rect x="33" y="33" width="1" height="1"/><rect x="34" y="33" width="1" height="1"/><rect x="4" y="34" width="1" height="1"/><rect x="6" y="34" width="1" height="1"/><rect x="7" y="34" width="1" height="1"/><rect x="8" y="34" width="1" height="1"/><rect x="10" y="34" width="1" height="1"/><rect x="13" y="34" width="1" height="1"/><rect x="15" y="34" width="1" height="1"/><rect x="16" y="34" width="1" height="1"/><rect x="17" y="34" width="1" height="1"/><rect x="18" y="34" width="1" height="1"/><rect x="19" y="34" width="1" height="1"/><rect x="24" y="34" width="1" height="1"/><rect x="25" y="34" width="1" height="1"/><rect x="26" y="34" width="1" height="1"/><rect x="28" y="34" width="1" height="1"/><rect x="30" y="34" width="1" height="1"/><rect x="31" y="34" width="1" height="1"/><rect x="32" y="34" width="1" height="1"/><rect x="4" y="35" width="1" height="1"/><rect x="10" y="35" width="1" height="1"/><rect x="17" y="35" width="1" height="1"/><rect x="19" y="35" width="1" height="1"/><rect x="20" y="35" width="1" height="1"/><rect x="21" y="35" width="1" height="1"/><rect x="22" y="35" width="1" height="1"/><rect x="23" y="35" width="1" height="1"/><rect x="25" y="35" width="1" height="1"/><rect x="29" y="35" width="1" height="1"/><rect x="4" y="36" width="1" height="1"/><rect x="5" y="36" width="1" height="1"/><rect x="6" y="36" width="1" height="1"/><rect x="7" y="36" width="1" height="1"/><rect x="8" y="36" width="1" height="1"/><rect x="9" y="36" width="1" height="1"/><rect x="10" y="36" width="1" height="1"/><rect x="12" y="36" width="1" height="1"/><rect x="13" y="36" width="1" height="1"/><rect x="14" y="36" width="1" height="1"/><rect x="18" y="36" width="1" height="1"/><rect x="20" y="36" width="1" height="1"/><rect x="21" y="36" width="1" height="1"/><rect x="24" y="36" width="1" height="1"/><rect x="25" y="36" width="1" height="1"/><rect x="27" y="36" width="1" height="1"/><rect x="28" y="36" width="1" height="1"/><rect x="29" y="36" width="1" height="1"/><rect x="30" y="36" width="1" height="1"/><rect x="34" y="36" width="1" height="1"/><rect x="36" y="36" width="1" height="1"/></g></svg>';
+
+  // 1 scan
+  $('scanBtn').addEventListener('click', () => {
+    const cam = $('camera');
+    if($('scanToast').hidden === false){ show('choose'); return; }
+    cam.classList.add('scanning');
+    $('scanBtn').disabled = true; $('scanBtn').textContent = 'Scanning…';
+    scanTimer = setTimeout(() => {
+      cam.classList.remove('scanning');
+      $('scanToast').hidden = false;
+      $('scanBtn').disabled = false; $('scanBtn').textContent = 'Open smartbox.pt/l/MTS-07';
+    }, 1600);
+  });
+  $('scanToast').addEventListener('click', () => show('choose'));
+
+  // 2 choose
+  $('webBtn').addEventListener('click', () => show('login'));
+  $('appBtn').addEventListener('click', () => { $('appSheet').hidden = false; });
+  $('appToWeb').addEventListener('click', () => show('login'));
+
+  // 3 login
+  $('loginForm').addEventListener('submit', e => {
+    e.preventDefault();
+    const name = $('name').value.trim(), email = $('email').value.trim();
+    if(!name){ $('err').textContent = 'Add your first name so we know whose gear it is.'; $('name').focus(); return; }
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ $('err').textContent = 'Check your email: it should look like name@example.com.'; $('email').focus(); return; }
+    $('err').textContent = '';
+    user.name = name;
+    $('hi').textContent = 'Hi, ' + name;
+    renderCatalog(); show('catalog');
+  });
+
+  // 4 catalog
+  function renderCatalog(){
+    $('chips').innerHTML = CATS.map(c => `<button class="chip" type="button" aria-pressed="${c===cat}" data-cat="${c}">${c}</button>`).join('');
+    const list = ITEMS.filter(i => cat==='All' || i.cat===cat);
+    $('grid').innerHTML = list.map(i => `
+      <button class="card" type="button" data-id="${i.id}">
+        <span class="pic">${ICON[i.icon]}</span>
+        <b>${i.name}</b>
+        <span class="meta"><span class="left ${i.left<2?'low':''}">${i.left} left</span><span>${i.id==='lock' ? i.price : '90 min free'}</span></span>
+        <span class="by">${i.brand==='SmartBox' ? 'SmartBox locker' : 'Supplied by ' + i.brand}</span>
+      </button>`).join('');
+  }
+  $('chips').addEventListener('click', e => { const b = e.target.closest('.chip'); if(!b) return; cat = b.dataset.cat; renderCatalog(); });
+  $('grid').addEventListener('click', e => { const c = e.target.closest('.card'); if(!c) return; openDetail(ITEMS.find(i => i.id===c.dataset.id)); });
+
+  // 5 detail
+  function openDetail(i){
+    const storage = i.id==='lock';
+    $('v-detail').innerHTML = `
+      <button class="back" type="button" id="back"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 5l-7 7 7 7"/></svg>All items</button>
+      <div class="big-pic">${ICON[i.icon]}</div>
+      <div><h2 style="font-family:var(--display);font-size:24px;margin:0">${i.name}</h2><span class="small">${i.left} available in locker MTS-07</span></div>
+      <div class="rows">
+        ${storage ? `<div class="row"><span>Price</span><span>${i.price} from the first minute</span></div>` : `<div class="row"><span>First 90 minutes</span><span style="color:var(--ok)">Free</span></div>
+        <div class="row"><span>After that</span><span>${i.price}</span></div>`}
+        <div class="row"><span>Deposit</span><span>${storage ? 'None' : i.deposit + ', back when you return it with a photo'}</span></div>
+        <div class="row"><span>Pay with</span><span>Apple Pay, Google Pay, MB WAY, card</span></div>
+      </div>
+      ${i.url ? `<div class="supplier"><span>Gear supplied by <b>${i.brand}</b>. Like it? Buy your own.</span><a href="${i.url}" target="_blank" rel="noopener">See at ${i.brand} ↗</a></div>` : `<div class="supplier"><span>Keep your phone, keys and wallet safe while you play. Opens only with your code.</span></div>`}
+      <button class="btn primary" type="button" id="unlock">${storage ? 'Rent a locker (€1 / hour)' : 'Borrow and open locker'}</button>`;
+    $('back').addEventListener('click', () => show('catalog'));
+    $('unlock').addEventListener('click', () => payStep(i));
+    show('detail');
+  }
+
+  // 5b payment (demo only)
+  const PAY = [
+    {id:'apple', name:'Apple Pay', sub:'Face ID or Touch ID'},
+    {id:'google', name:'Google Pay', sub:'Card saved in Google'},
+    {id:'mbway', name:'MB WAY', sub:'Confirm in the MB WAY app'},
+    {id:'card', name:'Credit or debit card', sub:'Visa, Mastercard'}
+  ];
+  const PAYICON = {
+    apple:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="12" rx="3"/><path d="M8 12h8"/></svg>',
+    google:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M12 12h7"/></svg>',
+    mbway:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M10 9l2 2 3-4"/></svg>',
+    card:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/></svg>'
+  };
+  function payStep(i){
+    const isLock = i.id==='lock';
+    let sel = user.pay || 'apple';
+    const render = () => {
+      $('v-pay').innerHTML = `
+        <button class="back" type="button" id="payBack"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 5l-7 7 7 7"/></svg>${i.name}</button>
+        <div><h2 style="font-family:var(--display);font-size:24px;margin:4px 0 4px">How do you want to pay?</h2>
+        <span class="small">${isLock ? 'You pay €' + i.rate + ' per hour when you collect your things.' : 'Nothing is charged now. We hold a ' + i.deposit + ' deposit and release it when you return the item with a photo.'}</span></div>
+        <div class="rows">
+          <div class="row"><span>Pay now</span><span>€0.00</span></div>
+          <div class="row"><span>${isLock ? 'Locker' : 'Deposit held'}</span><span>${isLock ? '€' + i.rate + ' / hour' : i.deposit}</span></div>
+          ${isLock ? '' : '<div class="row"><span>First 90 minutes</span><span style="color:var(--ok)">Free</span></div>'}
+        </div>
+        <div class="paylist" role="radiogroup" aria-label="Payment method">
+          ${PAY.map(p => `<button type="button" role="radio" aria-checked="${p.id===sel}" class="payopt" data-pay="${p.id}">
+            <span class="ico">${PAYICON[p.id]}</span><span><b>${p.name}</b><small>${p.sub}</small></span><span class="dot"></span></button>`).join('')}
+        </div>
+        <button class="btn primary" type="button" id="payGo">${isLock ? 'Confirm with ' : 'Hold deposit with '}${PAY.find(p=>p.id===sel).name}</button>
+        <span class="small">Demo: no real payment is made and no card details are asked.</span>`;
+      $('payBack').addEventListener('click', () => openDetail(i));
+      $('v-pay').querySelectorAll('.payopt').forEach(b => b.addEventListener('click', () => { sel = b.dataset.pay; render(); }));
+      $('payGo').addEventListener('click', () => confirmPay(i, sel));
+    };
+    render(); show('pay');
+  }
+  function confirmPay(i, sel){
+    const p = PAY.find(x => x.id===sel);
+    const go = $('payGo'); go.disabled = true;
+    go.textContent = sel==='mbway' ? 'Waiting for MB WAY confirmation…' : sel==='card' ? 'Checking card…' : 'Confirm with ' + p.name + '…';
+    setTimeout(() => {
+      user.pay = sel; user.payName = p.name;
+      go.textContent = 'Approved'; go.style.background = 'var(--ok)';
+      setTimeout(() => openLocker(i), 600);
+    }, 1400);
+  }
+
+  // 6 open + timer, 7 photo on return
+  const pad = n => String(n).padStart(2,'0');
+  const FREE = 5400; // 90 minutes free for gear
+  function cost(i, sec){
+    if(i.id==='lock') return Math.max(1, Math.ceil(sec/3600)) * i.rate;   // locker: always paid, from the first minute
+    return sec <= FREE ? 0 : Math.ceil((sec-FREE)/3600) * i.rate;        // gear: free 90 min, then per hour
+  }
+  function openLocker(i){
+    const door = pad(Math.floor(Math.random()*9)+1);
+    const isLock = i.id==='lock';
+    let sec = 0;
+    $('v-open').innerHTML = `
+      <div class="open-hero">
+        <div class="door"><b>${door}</b></div>
+        <h2 style="font-family:var(--display);font-size:24px;margin:8px 0 0">Door ${door} is open</h2>
+        <span class="small">${isLock ? 'Put your things inside and close the door. Only your code opens it.' : 'Take your ' + i.name.toLowerCase() + ' and close the door.'}</span>
+      </div>
+      <div class="rows" style="text-align:center;padding:14px">
+        <span class="small">Time used</span>
+        <div class="clock" id="clockUsed">00:00</div>
+        <span class="small" id="freeLeft"></span>
+      </div>
+      <button class="btn ghost" type="button" id="skip">${isLock ? 'Skip 1 hour (demo)' : 'Skip 85 minutes (demo)'}</button>
+      <button class="btn primary" type="button" id="ret">${isLock ? 'Collect my things' : 'Return ' + i.name.toLowerCase()}</button>`;
+    const tick = () => {
+      $('clockUsed').textContent = (sec>=3600 ? Math.floor(sec/3600)+':' : '') + pad(Math.floor(sec/60)%60) + ':' + pad(sec%60);
+      if(isLock){ $('freeLeft').textContent = `Personal locker: €${i.rate} / hour · so far €${cost(i,sec).toFixed(2)}`; return; }
+      const left = FREE - sec;
+      $('freeLeft').textContent = left > 0 ? `${pad(Math.floor(left/60))}:${pad(left%60)} free left` : `Free time over: €${i.rate} / hour · so far €${cost(i,sec).toFixed(2)}`;
+    };
+    tick();
+    clearInterval(timerId);
+    timerId = setInterval(() => { sec++; tick(); }, 1000);
+    $('skip').addEventListener('click', () => { sec += isLock ? 3600 : 5100; tick(); });
+    $('ret').addEventListener('click', () => { clearInterval(timerId); isLock ? finish(i, sec, null) : photoStep(i, sec, door); });
+    show('open');
+  }
+
+  function photoStep(i, sec, door){
+    let photo = null;
+    $('v-photo').innerHTML = `
+      <div><h2 style="font-family:var(--display);font-size:24px;margin:8px 0 4px">Take a photo to return it</h2>
+      <span class="small">Put the ${i.name.toLowerCase()} back in door ${door}, close it, and take a photo. The photo proves you returned it in good condition, so your deposit comes back.</span></div>
+      <div class="shot" id="shot">No photo yet</div>
+      <label class="btn ghost file" for="cam">Take photo<input id="cam" type="file" accept="image/*" capture="environment"></label>
+      <button class="btn ghost" type="button" id="demoPhoto">Use a demo photo</button>
+      <button class="btn primary" type="button" id="confirm" disabled>Confirm return</button>
+      <span class="small">Demo: the photo stays on this device and is not uploaded.</span>`;
+    const setPhoto = src => {
+      photo = src;
+      $('shot').classList.add('has');
+      $('shot').innerHTML = `<img src="${src}" alt="Photo of the returned ${i.name.toLowerCase()} in the locker">`;
+      $('confirm').disabled = false;
+    };
+    $('cam').addEventListener('change', e => { const f = e.target.files && e.target.files[0]; if(f) setPhoto(URL.createObjectURL(f)); });
+    $('demoPhoto').addEventListener('click', () => {
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><rect width="400" height="300" fill="#3D4248"/><rect x="60" y="30" width="280" height="240" rx="10" fill="#2b3035" stroke="#5a6168" stroke-width="6"/><g transform="translate(140 90) scale(1.9)" fill="none" stroke="#E8590C" stroke-width="3">${ICON[i.icon].replace(/<\/?svg[^>]*>/g,'')}</g><text x="200" y="258" fill="#F7F6F4" font-family="Arial" font-size="18" text-anchor="middle">DOOR ${door} · ${new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</text></svg>`;
+      setPhoto('data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg));
+    });
+    $('confirm').addEventListener('click', () => finish(i, sec, photo));
+    show('photo');
+  }
+
+  function finish(i, sec, photo){
+    const isLock = i.id==='lock';
+    const paid = '€' + cost(i, sec).toFixed(2);
+    const mins = Math.max(1, Math.round(sec/60));
+    $('v-open').innerHTML = `
+      <div class="done">
+        <div class="check"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5 9-10"/></svg></div>
+        <h2 style="font-family:var(--display);font-size:24px;margin:8px 0 0">Thanks, ${user.name}!</h2>
+        <span class="small">${isLock ? 'Your locker is closed and free again.' : 'Return confirmed with your photo. Your ' + i.deposit + ' deposit is back on your card.'}</span>
+      </div>
+      <div class="rows">
+        <div class="row"><span>Time used</span><span>${mins} min</span></div>
+        <div class="row"><span>${isLock ? 'Personal locker' : 'Free time'}</span><span>${isLock ? '€' + i.rate + ' / hour' : '90 min'}</span></div>
+        <div class="row"><span>You paid</span><span>${paid}</span></div>
+        <div class="row"><span>Paid with</span><span>${user.payName || 'Apple Pay'}</span></div>
+        ${photo ? '<div class="row"><span>Return photo</span><span style="color:var(--ok)">Saved with your receipt</span></div>' : ''}
+        <div class="row"><span>Receipt</span><span>Sent to your email</span></div>
+      </div>
+      <button class="btn primary" type="button" id="again">Borrow something else</button>`;
+    $('again').addEventListener('click', () => { renderCatalog(); show('catalog'); });
+    show('open');
+  }
+
+  // reset
+  $('reset').addEventListener('click', () => {
+    clearInterval(timerId); clearTimeout(scanTimer);
+    $('scanToast').hidden = true; $('camera').classList.remove('scanning');
+    $('scanBtn').disabled = false; $('scanBtn').textContent = 'Scan QR code';
+    $('appSheet').hidden = true; cat = 'All';
+    show('scan');
+  });
+
+  // live clock
+  const c = () => { const d = new Date(); $('clock').textContent = String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0'); };
+  c(); setInterval(c, 30000);
+  show('scan');
+})();
+</script>
+
+</body>
+</html>
